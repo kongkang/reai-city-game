@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斯坦福小镇游戏 V3 - A*寻路版（干净版）</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            font-family: sans-serif;
+        }
+        
+        #game-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 640px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            padding: 8px 12px;
+            background-color: #4472ca;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #365aa3;
+        }
+        
+        button.active {
+            background-color: #2ecc71;
+        }
+        
+        button.disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        #settings {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .setting-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .toggle-button {
+            display: flex;
+            align-items: center;
+        }
+        
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background-color: #ccc;
+            border-radius: 12px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        
+        .toggle.active {
+            background-color: #2ecc71;
+        }
+        
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: white;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+        
+        .toggle.active::after {
+            left: 28px;
+        }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .slider-container label {
+            margin-right: 10px;
+        }
+        
+        input[type="range"] {
+            flex: 1;
+        }
+        
+        .slider-value {
+            width: 40px;
+            text-align: right;
+            margin-left: 10px;
+        }
+        
+        h2 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .stats {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+        
+        #character {
+            transition: all 0.2s ease;
+        }
+        
+        /* 自定义控制面板样式 */
+        .control-panel {
+            width: 100%;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .control-row {
+            margin-bottom: 15px;
+        }
+        
+        .input-group {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .coordinate-input {
+            width: 60px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .text-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        .primary-button {
+            background-color: #4472ca;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .primary-button:hover {
+            background-color: #365aa3;
+        }
+        
+        label {
+            font-weight: 500;
+        }
+        
+        #characterStatus {
+            margin-top: 5px;
+            background-color: #e8f4f8;
+            border-left: 4px solid #4472ca;
+        }
+    </style>
+</head>
+<body>
+    <h1>斯坦福小镇游戏 V3 - A*寻路版（干净版）</h1>
+    
+    <div class="stats" id="character-stats">
+        当前位置: X: 0, Y: 0 (图块类型: 未知)
+    </div>
+    
+    <div id="game-container">
+        <div id="game-map">
+            <div id="character">
+                <!-- 行为气泡容器将通过JS动态添加 -->
+            </div>
+        </div>
+    </div>
+    
+    <div id="settings">
+        <div class="setting-group">
+            <div class="toggle-button">
+                <div class="toggle active" id="toggle-pathfinding"></div>
+                <span>A*寻路</span>
+            </div>
+            <div class="toggle-button">
+                <div class="toggle active" id="toggle-path-visualization"></div>
+                <span>显示路径</span>
+            </div>
+        </div>
+        
+        <div class="setting-group">
+            <div class="slider-container">
+                <label for="animation-speed">动画速度:</label>
+                <input type="range" id="animation-speed" min="50" max="500" step="50" value="200">
+                <span class="slider-value" id="speed-value">200ms</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="controls">
+        <h2>移动控制</h2>
+        <div class="control-group">
+            <button id="move-up">↑ 上</button>
+            <button id="move-down">↓ 下</button>
+            <button id="move-left">← 左</button>
+            <button id="move-right">→ 右</button>
+        </div>
+        
+        <h2>特定位置</h2>
+        <div class="control-group">
+            <button onclick="moveCharacter(5, 10)">南门 (5,10)</button>
+            <button onclick="moveCharacter(10, 6)">东门 (10,6)</button>
+            <button onclick="moveCharacter(6, 17)">小屋门 (6,17)</button>
+            <button onclick="moveCharacter(5, 5)">主屋内部 (5,5)</button>
+            <button onclick="moveCharacter(14, 4)">右侧建筑内 (14,4)</button>
+            <button onclick="moveCharacter(6, 15)">小屋内部 (6,15)</button>
+        </div>
+        
+        <h2>行为测试</h2>
+        <div class="control-group">
+            <button onclick="setCharacterAction('我在思考接下来去哪里')">思考</button>
+            <button onclick="setCharacterAction('这是个美丽的小镇')">赞美小镇</button>
+            <button onclick="setCharacterAction('我想去拜访朋友')">拜访朋友</button>
+            <button onclick="setCharacterAction('我需要买些食物')">买食物</button>
+        </div>
+        
+        <h2>寻路测试</h2>
+        <div class="control-group">
+            <button id="test-path1">测试1: 室外绕行建筑</button>
+            <button id="test-path2">测试2: 穿过多个房间</button>
+            <button id="test-path3">测试3: 长距离寻路</button>
+            <button id="stop-movement">停止移动</button>
+        </div>
+        
+        <h2>自定义控制</h2>
+        <div class="control-panel">
+            <div class="control-row">
+                <div class="input-group">
+                    <label for="targetX">目标X:</label>
+                    <input type="number" id="targetX" name="targetX" min="0" max="19" value="0" class="coordinate-input">
+                    
+                    <label for="targetY">目标Y:</label>
+                    <input type="number" id="targetY" name="targetY" min="0" max="19" value="0" class="coordinate-input">
+                    
+                    <button id="moveButton" class="primary-button">移动角色</button>
+                </div>
+            </div>
+            
+            <div class="control-row">
+                <div class="input-group">
+                    <label for="actionDescription">行为描述:</label>
+                    <input type="text" id="actionDescription" name="actionDescription" placeholder="输入角色行为描述..." class="text-input">
+                    
+                    <button id="setAction" class="primary-button">设置行为</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="stats" id="path-stats">
+        路径信息: 尚未生成路径
+    </div>
+    
+    <div class="stats" id="characterStatus">
+        当前状态: X:0, Y:0, Action: 空闲
+    </div>
+    
+    <!-- 添加必要的脚本 -->
+    <script src="code/map_data_v2.js"></script>
+    <script src="code/pathfinding.js"></script>
+    <script src="code/game_v3.js"></script>
+    <script src="code/ui_controller.js"></script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斯坦福小镇游戏 V2 测试</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        #game-container {
+            margin-bottom: 20px;
+        }
+        
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 640px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 8px 12px;
+            background-color: #4472ca;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #365aa3;
+        }
+        
+        #map-legend {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: auto auto;
+            gap: 10px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #333;
+        }
+        
+        h2 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        #current-position {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>斯坦福小镇游戏 V2 测试</h1>
+    
+    <div id="game-container">
+        <div id="game-map">
+            <div id="character"></div>
+            <div id="action-bubble"></div>
+        </div>
+    </div>
+    
+    <div id="current-position">当前位置: X: 0, Y: 0 (图块类型: 未知)</div>
+    
+    <div id="controls">
+        <h2>移动控制</h2>
+        <div class="control-group">
+            <button id="move-up">向上移动</button>
+            <button id="move-down">向下移动</button>
+            <button id="move-left">向左移动</button>
+            <button id="move-right">向右移动</button>
+        </div>
+        
+        <h2>特定位置</h2>
+        <div class="control-group">
+            <button onclick="moveCharacter(5, 10)">南门 (5,10)</button>
+            <button onclick="moveCharacter(10, 6)">东门 (10,6)</button>
+            <button onclick="moveCharacter(6, 17)">小屋门 (6,17)</button>
+            <button onclick="moveCharacter(5, 5)">主屋内部 (5,5)</button>
+            <button onclick="moveCharacter(14, 4)">右侧建筑内 (14,4)</button>
+            <button onclick="moveCharacter(6, 15)">小屋内部 (6,15)</button>
+        </div>
+        
+        <h2>行为测试</h2>
+        <div class="control-group">
+            <button onclick="setCharacterAction('我在思考接下来去哪里')">思考</button>
+            <button onclick="setCharacterAction('这是个美丽的小镇')">赞美小镇</button>
+            <button onclick="setCharacterAction('我想去拜访朋友')">拜访朋友</button>
+            <button onclick="setCharacterAction('我需要买些食物')">买食物</button>
+        </div>
+    </div>
+    
+    <h2>地图图例</h2>
+    <div id="map-legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #a6d785;"></div>
+            <span>草地 (可通行)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #8c6f5c;"></div>
+            <span>墙壁 (不可通行)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #b88b4a;"></div>
+            <span>门 (可通行)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #d9c49e;"></div>
+            <span>室内地板 (可通行)</span>
+        </div>
+    </div>
+    
+    <!-- 添加地图数据和游戏逻辑脚本 -->
+    <script src="code/map_data_v2.js"></script>
+    <script src="code/game_v2.js"></script>
+    
+    <script>
+        // 添加方向移动按钮功能
+        document.getElementById('move-up').addEventListener('click', () => {
+            if (characterState && characterState.y > 0) {
+                moveCharacter(characterState.x, characterState.y - 1);
+            }
+        });
+        
+        document.getElementById('move-down').addEventListener('click', () => {
+            if (characterState && characterState.y < gameConfig.mapHeight - 1) {
+                moveCharacter(characterState.x, characterState.y + 1);
+            }
+        });
+        
+        document.getElementById('move-left').addEventListener('click', () => {
+            if (characterState && characterState.x > 0) {
+                moveCharacter(characterState.x - 1, characterState.y);
+            }
+        });
+        
+        document.getElementById('move-right').addEventListener('click', () => {
+            if (characterState && characterState.x < gameConfig.mapWidth - 1) {
+                moveCharacter(characterState.x + 1, characterState.y);
+            }
+        });
+        
+        // 更新位置信息显示
+        function updatePositionInfo() {
+            const positionElement = document.getElementById('current-position');
+            const tileType = window.getTileTypeName ? 
+                window.getTileTypeName(characterState.x, characterState.y) : "未知";
+            
+            positionElement.textContent = `当前位置: X: ${characterState.x}, Y: ${characterState.y} (图块类型: ${tileType})`;
+        }
+        
+        // 重写moveCharacter函数以更新位置信息
+        const originalMoveCharacter = window.moveCharacter;
+        window.moveCharacter = function(x, y) {
+            const result = originalMoveCharacter(x, y);
+            if (result) {
+                updatePositionInfo();
+            }
+            return result;
+        };
+        
+        // 页面加载后更新位置信息
+        window.addEventListener('load', function() {
+            setTimeout(updatePositionInfo, 500); // 给地图加载一点时间
+        });
+    </script>
+</body>
+</html>

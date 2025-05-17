@@ -1,0 +1,109 @@
+body {
+    /* Tailwind 将处理背景和居中 */
+    font-family: 'Arial', sans-serif; /* 保留一个备用字体 */
+}
+
+#game-container {
+    /* Tailwind 将处理大部分样式 */
+    /* 原始边框和阴影已由Tailwind类取代 */
+}
+
+#game-map {
+    width: 320px; /* 初始值，会被JS覆盖 */
+    height: 320px; /* 初始值，会被JS覆盖 */
+    background-color: #a6d785; /* 草地的浅绿色 */
+    position: relative;
+    background-image:
+        linear-gradient(to right, rgba(94, 140, 62, 0.2) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(94, 140, 62, 0.2) 1px, transparent 1px);
+    background-size: 32px 32px; /* 图块大小 */
+    overflow: visible; /* 重要：允许气泡超出地图容器 */
+}
+
+/* 地图图块基本样式 */
+.map-tile {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    transition: background-color 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
+    z-index: 1;
+}
+
+/* 各类型图块样式 */
+.tile-grass {
+    background-color: #a6d785; /* 草地颜色 */
+}
+
+.tile-wall {
+    background-color: #8c6f5c; /* 墙壁颜色 */
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+}
+
+.tile-door {
+    background-color: #b88b4a; /* 门的颜色 */
+    border: 2px solid #7a5a30;
+    box-shadow: inset 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.tile-indoor-floor {
+    background-color: #d9c49e; /* 室内地板颜色 */
+    background-image: linear-gradient(45deg, #cbb89a 25%, transparent 25%, transparent 75%, #cbb89a 75%);
+    background-size: 8px 8px;
+}
+
+#character {
+    width: 16px;
+    height: 16px;
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    transition: all 0.3s ease;
+    border-radius: 3px; /* 稍微圆润一点 */
+    box-sizing: border-box;
+    /* 简单的角色样式 - 保持像素感但更清晰 */
+    background-color: #4A90E2; /* 更现代的蓝色 */
+    border: 2px solid #334155; /* 深蓝灰色边框 */
+    z-index: 10; /* 确保角色在地图之上 */
+}
+
+#action-bubble-container {
+    position: absolute;
+    top: -30px; /* 定位在角色头顶 */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100; /* 确保气泡不被任何元素遮挡 */
+    width: 100px; /* 给气泡一个固定宽度 */
+    pointer-events: none; /* 允许点击通过气泡 */
+}
+
+#action-bubble {
+    background-color: white;
+    border: 2px solid #334155; /* 与角色边框颜色一致 */
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: #334155; /* 深蓝灰色文字 */
+    text-align: center;
+    display: none; /* 默认隐藏 */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    position: relative; /* 用于伪元素定位 */
+    white-space: nowrap; /* 防止文本换行 */
+    min-width: 60px; /* 最小宽度 */
+    max-width: 150px; /* 最大宽度 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#action-bubble:after { /* 气泡尾巴 */
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: white transparent transparent transparent; /* 指向下方 */
+    filter: drop-shadow(0 1px 0px #334155); /* 模拟边框 */
+}

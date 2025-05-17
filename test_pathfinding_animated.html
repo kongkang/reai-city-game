@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A*寻路算法动画演示</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            font-family: sans-serif;
+        }
+        
+        #game-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .path-node {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: rgba(255, 0, 0, 0.7);
+            border-radius: 50%;
+            z-index: 2;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .path-node.visible {
+            opacity: 1;
+        }
+        
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 640px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            padding: 8px 12px;
+            background-color: #4472ca;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #365aa3;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #333;
+        }
+        
+        #path-info {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            width: 100%;
+            max-width: 640px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #status-display {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 640px;
+            margin-bottom: 20px;
+        }
+        
+        .status-box {
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            font-family: monospace;
+            flex: 1;
+            margin: 0 5px;
+        }
+        
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+            width: 100%;
+            max-width: 640px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">A*寻路算法动画演示</div>
+    
+    <div id="status-display">
+        <div class="status-box" id="current-position">当前位置: X: 0, Y: 0</div>
+        <div class="status-box" id="target-position">目标位置: 未设置</div>
+    </div>
+    
+    <div id="game-container">
+        <div id="game-map">
+            <div id="character"></div>
+            <div id="action-bubble"></div>
+            <!-- 路径节点将在这里动态添加 -->
+        </div>
+    </div>
+    
+    <div id="controls">
+        <div class="control-group">
+            <button id="set-target">设置当前位置为目标点</button>
+            <button id="find-path">查找并跟随路径</button>
+            <button id="stop-following">停止跟随</button>
+            <button id="clear-path">清除路径</button>
+        </div>
+        
+        <div class="control-group">
+            <button id="move-up">↑ 上</button>
+            <button id="move-down">↓ 下</button>
+            <button id="move-left">← 左</button>
+            <button id="move-right">→ 右</button>
+        </div>
+        
+        <div class="control-group">
+            <button id="test-scenario1">测试场景1: 从室外到房间内部</button>
+            <button id="test-scenario2">测试场景2: 穿过多个房间</button>
+            <button id="test-scenario3">测试场景3: 长距离路径</button>
+        </div>
+    </div>
+    
+    <div id="path-info">寻路信息将显示在这里...</div>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #a6d785;"></div>
+            <span>草地 (可通行)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #8c6f5c;"></div>
+            <span>墙壁 (不可通行)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #b88b4a;"></div>
+            <span>门 (可通行)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #d9c49e;"></div>
+            <span>室内地板 (可通行)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: rgba(255, 0, 0, 0.7); width: 8px; height: 8px; border-radius: 50%;"></div>
+            <span>路径节点</span>
+        </div>
+    </div>
+    
+    <!-- 添加必要的脚本 -->
+    <script src="code/map_data_v2.js"></script>
+    <script src="code/game_v2.js"></script>
+    <script src="code/pathfinding.js"></script>
+    
+    <script>
+        // 游戏状态
+        let gameState = {
+            targetX: null,
+            targetY: null,
+            currentPath: null,
+            isFollowingPath: false,
+            pathIndex: 0,
+            moveInterval: null
+        };
+        
+        // DOM元素
+        const gameMap = document.getElementById('game-map');
+        const pathInfo = document.getElementById('path-info');
+        const currentPositionElement = document.getElementById('current-position');
+        const targetPositionElement = document.getElementById('target-position');
+        const findPathButton = document.getElementById('find-path');
+        const stopFollowingButton = document.getElementById('stop-following');
+        const clearPathButton = document.getElementById('clear-path');
+        
+        // 初始化按钮状态
+        stopFollowingButton.disabled = true;
+        findPathButton.disabled = true;
+        
+        // 更新位置显示
+        function updatePositionDisplay() {
+            const tileType = window.getTileTypeName ? 
+                window.getTileTypeName(characterState.x, characterState.y) : "未知";
+            
+            currentPositionElement.textContent = `当前位置: X: ${characterState.x}, Y: ${characterState.y} (${tileType})`;
+            
+            if (gameState.targetX !== null && gameState.targetY !== null) {
+                const targetTileType = window.getTileTypeName ? 
+                    window.getTileTypeName(gameState.targetX, gameState.targetY) : "未知";
+                
+                targetPositionElement.textContent = `目标位置: X: ${gameState.targetX}, Y: ${gameState.targetY} (${targetTileType})`;
+                findPathButton.disabled = false;
+            } else {
+                targetPositionElement.textContent = `目标位置: 未设置`;
+                findPathButton.disabled = true;
+            }
+        }
+        
+        // 设置目标点
+        document.getElementById('set-target').addEventListener('click', function() {
+            gameState.targetX = characterState.x;
+            gameState.targetY = characterState.y;
+            updatePositionDisplay();
+            pathInfo.textContent = `目标点设置为 (${gameState.targetX}, ${gameState.targetY})`;
+        });
+        
+        // 查找并跟随路径
+        document.getElementById('find-path').addEventListener('click', async function() {
+            if (gameState.targetX === null || gameState.targetY === null) {
+                pathInfo.textContent = "请先设置目标点";
+                return;
+            }
+            
+            await findAndFollowPath(characterState.x, characterState.y, gameState.targetX, gameState.targetY);
+        });
+        
+        // 停止跟随路径
+        document.getElementById('stop-following').addEventListener('click', function() {
+            stopFollowingPath();
+            pathInfo.textContent = "已停止跟随路径";
+        });
+        
+        // 清除路径
+        document.getElementById('clear-path').addEventListener('click', function() {
+            stopFollowingPath();
+            clearPathNodes();
+            gameState.currentPath = null;
+            pathInfo.textContent = "路径已清除";
+        });
+        
+        // 方向按钮
+        document.getElementById('move-up').addEventListener('click', function() {
+            if (characterState.y > 0) {
+                moveCharacter(characterState.x, characterState.y - 1);
+            }
+        });
+        
+        document.getElementById('move-down').addEventListener('click', function() {
+            if (characterState.y < gameConfig.mapHeight - 1) {
+                moveCharacter(characterState.x, characterState.y + 1);
+            }
+        });
+        
+        document.getElementById('move-left').addEventListener('click', function() {
+            if (characterState.x > 0) {
+                moveCharacter(characterState.x - 1, characterState.y);
+            }
+        });
+        
+        document.getElementById('move-right').addEventListener('click', function() {
+            if (characterState.x < gameConfig.mapWidth - 1) {
+                moveCharacter(characterState.x + 1, characterState.y);
+            }
+        });
+        
+        // 测试场景1: 从室外到房间内部
+        document.getElementById('test-scenario1').addEventListener('click', async function() {
+            stopFollowingPath();
+            clearPathNodes();
+            
+            // 将角色移动到室外位置
+            moveCharacter(3, 11);
+            // 设置目标点为房间内部
+            gameState.targetX = 5, gameState.targetY = 5;
+            updatePositionDisplay();
+            
+            // 短暂延迟后开始寻路
+            setTimeout(async () => {
+                await findAndFollowPath(characterState.x, characterState.y, gameState.targetX, gameState.targetY);
+            }, 500);
+        });
+        
+        // 测试场景2: 穿过多个房间
+        document.getElementById('test-scenario2').addEventListener('click', async function() {
+            stopFollowingPath();
+            clearPathNodes();
+            
+            // 将角色移动到第一个房间
+            moveCharacter(5, 5);
+            // 设置目标点为第二个房间
+            gameState.targetX = 14, gameState.targetY = 4;
+            updatePositionDisplay();
+            
+            // 短暂延迟后开始寻路
+            setTimeout(async () => {
+                await findAndFollowPath(characterState.x, characterState.y, gameState.targetX, gameState.targetY);
+            }, 500);
+        });
+        
+        // 测试场景3: 长距离路径
+        document.getElementById('test-scenario3').addEventListener('click', async function() {
+            stopFollowingPath();
+            clearPathNodes();
+            
+            // 将角色移动到地图左上角
+            moveCharacter(2, 1);
+            // 设置目标点为地图右下角
+            gameState.targetX = 18, gameState.targetY = 18;
+            updatePositionDisplay();
+            
+            // 短暂延迟后开始寻路
+            setTimeout(async () => {
+                await findAndFollowPath(characterState.x, characterState.y, gameState.targetX, gameState.targetY);
+            }, 500);
+        });
+        
+        // 找到并跟随路径
+        async function findAndFollowPath(startX, startY, endX, endY) {
+            // 停止当前路径跟随
+            stopFollowingPath();
+            clearPathNodes();
+            
+            // 使用A*算法查找路径
+            const path = findPath(startX, startY, endX, endY, sampleMapData);
+            
+            if (!path) {
+                pathInfo.textContent = `无法找到从 (${startX}, ${startY}) 到 (${endX}, ${endY}) 的路径`;
+                return;
+            }
+            
+            gameState.currentPath = path;
+            
+            // 显示路径
+            await displayPathAnimated(path);
+            
+            // 更新信息
+            pathInfo.textContent = `找到路径，长度: ${path.length}\n` + 
+                                   `开始跟随路径: (${startX}, ${startY}) -> (${endX}, ${endY})`;
+            
+            // 开始跟随路径
+            followPath();
+        }
+        
+        // 显示路径（带动画）
+        async function displayPathAnimated(path) {
+            if (!path) return;
+            
+            // 清除现有路径节点
+            clearPathNodes();
+            
+            // 为路径上的每个点创建一个标记
+            for (let i = 1; i < path.length - 1; i++) {
+                const point = path[i];
+                const pathNode = document.createElement('div');
+                pathNode.className = 'path-node';
+                
+                // 计算节点在地图上的像素位置（居中于图块）
+                const pixelX = point.x * gameConfig.tileSize + gameConfig.tileSize / 2;
+                const pixelY = point.y * gameConfig.tileSize + gameConfig.tileSize / 2;
+                
+                pathNode.style.left = `${pixelX - 4}px`; // 居中点（减去节点半径）
+                pathNode.style.top = `${pixelY - 4}px`;  // 居中点（减去节点半径）
+                
+                gameMap.appendChild(pathNode);
+                
+                // 延迟显示每个节点以创建动画效果
+                await new Promise(resolve => {
+                    setTimeout(() => {
+                        pathNode.classList.add('visible');
+                        resolve();
+                    }, 30 * i); // 每个节点之间有短暂延迟
+                });
+            }
+        }
+        
+        // 跟随路径
+        function followPath() {
+            if (!gameState.currentPath || gameState.currentPath.length <= 1) {
+                return;
+            }
+            
+            gameState.isFollowingPath = true;
+            gameState.pathIndex = 1; // 从第二个节点开始（第一个是起点）
+            
+            // 更新按钮状态
+            stopFollowingButton.disabled = false;
+            findPathButton.disabled = true;
+            
+            // 设置角色行为
+            setCharacterAction("我在跟随路径...");
+            
+            // 创建定时器，使角色沿着路径移动
+            gameState.moveInterval = setInterval(() => {
+                if (!gameState.isFollowingPath || gameState.pathIndex >= gameState.currentPath.length) {
+                    stopFollowingPath();
+                    
+                    // 如果成功到达终点
+                    if (gameState.pathIndex >= gameState.currentPath.length) {
+                        setCharacterAction("我到达了目的地！");
+                        pathInfo.textContent += "\n已到达目的地！";
+                    }
+                    return;
+                }
+                
+                const nextPoint = gameState.currentPath[gameState.pathIndex];
+                moveCharacter(nextPoint.x, nextPoint.y);
+                gameState.pathIndex++;
+                
+            }, 300); // 每300毫秒移动一步
+        }
+        
+        // 停止跟随路径
+        function stopFollowingPath() {
+            if (gameState.moveInterval) {
+                clearInterval(gameState.moveInterval);
+                gameState.moveInterval = null;
+            }
+            
+            gameState.isFollowingPath = false;
+            
+            // 更新按钮状态
+            stopFollowingButton.disabled = true;
+            findPathButton.disabled = false;
+        }
+        
+        // 清除所有路径节点
+        function clearPathNodes() {
+            const pathNodes = gameMap.querySelectorAll('.path-node');
+            pathNodes.forEach(node => node.remove());
+        }
+        
+        // 重写moveCharacter函数以更新位置信息
+        const originalMoveCharacter = window.moveCharacter;
+        window.moveCharacter = function(x, y) {
+            const result = originalMoveCharacter(x, y);
+            if (result) {
+                updatePositionDisplay();
+            }
+            return result;
+        };
+        
+        // 页面加载后更新位置信息
+        window.addEventListener('load', function() {
+            setTimeout(updatePositionDisplay, 500); // 给地图加载一点时间
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A*寻路算法测试</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            font-family: sans-serif;
+        }
+        
+        #game-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .path-node {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: rgba(255, 0, 0, 0.7);
+            border-radius: 50%;
+            z-index: 2;
+        }
+        
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 640px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            padding: 8px 12px;
+            background-color: #4472ca;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #365aa3;
+        }
+        
+        h2 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        #path-info {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            width: 100%;
+            max-width: 640px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #current-position {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">A*寻路算法测试</div>
+    
+    <div id="game-container">
+        <div id="game-map">
+            <div id="character"></div>
+            <div id="action-bubble"></div>
+            <!-- 路径节点将在这里动态添加 -->
+        </div>
+    </div>
+    
+    <div id="current-position">当前位置: X: 0, Y: 0 (图块类型: 未知)</div>
+    
+    <div id="controls">
+        <h2>起点和终点设置</h2>
+        <div class="control-group">
+            <button id="set-start">设置当前位置为起点</button>
+            <button id="set-end">设置当前位置为终点</button>
+            <button id="find-path">查找路径</button>
+            <button id="clear-path">清除路径</button>
+        </div>
+        
+        <h2>预设位置测试</h2>
+        <div class="control-group">
+            <button id="test-path1">测试: 从草地到门口</button>
+            <button id="test-path2">测试: 从一栋建筑到另一栋</button>
+            <button id="test-path3">测试: 绕过墙壁</button>
+            <button id="test-path4">测试: 无路径情况</button>
+        </div>
+        
+        <h2>移动控制</h2>
+        <div class="control-group">
+            <button id="move-up">↑ 上</button>
+            <button id="move-down">↓ 下</button>
+            <button id="move-left">← 左</button>
+            <button id="move-right">→ 右</button>
+        </div>
+    </div>
+    
+    <div id="path-info">寻路信息将显示在这里...</div>
+    
+    <!-- 添加必要的脚本 -->
+    <script src="code/map_data_v2.js"></script>
+    <script src="code/game_v2.js"></script>
+    <script src="code/pathfinding.js"></script>
+    
+    <script>
+        // 路径查找状态
+        let pathState = {
+            startX: null,
+            startY: null,
+            endX: null,
+            endY: null,
+            currentPath: null
+        };
+        
+        // DOM元素
+        const gameMap = document.getElementById('game-map');
+        const pathInfo = document.getElementById('path-info');
+        const positionElement = document.getElementById('current-position');
+        
+        // 更新位置信息显示
+        function updatePositionInfo() {
+            const tileType = window.getTileTypeName ? 
+                window.getTileTypeName(characterState.x, characterState.y) : "未知";
+            
+            positionElement.textContent = `当前位置: X: ${characterState.x}, Y: ${characterState.y} (图块类型: ${tileType})`;
+        }
+        
+        // 设置起点
+        document.getElementById('set-start').addEventListener('click', function() {
+            pathState.startX = characterState.x;
+            pathState.startY = characterState.y;
+            pathInfo.textContent = `起点设置为 (${pathState.startX}, ${pathState.startY})`;
+        });
+        
+        // 设置终点
+        document.getElementById('set-end').addEventListener('click', function() {
+            pathState.endX = characterState.x;
+            pathState.endY = characterState.y;
+            pathInfo.textContent = `终点设置为 (${pathState.endX}, ${pathState.endY})`;
+        });
+        
+        // 清除路径
+        document.getElementById('clear-path').addEventListener('click', function() {
+            clearPathNodes();
+            pathState.currentPath = null;
+            pathInfo.textContent = "路径已清除";
+        });
+        
+        // 查找路径
+        document.getElementById('find-path').addEventListener('click', function() {
+            if (pathState.startX === null || pathState.startY === null) {
+                pathInfo.textContent = "错误: 请先设置起点";
+                return;
+            }
+            
+            if (pathState.endX === null || pathState.endY === null) {
+                pathInfo.textContent = "错误: 请先设置终点";
+                return;
+            }
+            
+            findAndDisplayPath(pathState.startX, pathState.startY, pathState.endX, pathState.endY);
+        });
+        
+        // 测试用例：从草地到门口
+        document.getElementById('test-path1').addEventListener('click', function() {
+            clearPathNodes();
+            findAndDisplayPath(3, 1, 5, 10); // 根据地图调整实际坐标
+            moveCharacter(3, 1);
+        });
+        
+        // 测试用例：从一栋建筑到另一栋
+        document.getElementById('test-path2').addEventListener('click', function() {
+            clearPathNodes();
+            findAndDisplayPath(5, 5, 14, 4); // 主建筑内部到右侧建筑内部
+            moveCharacter(5, 5);
+        });
+        
+        // 测试用例：绕过墙壁
+        document.getElementById('test-path3').addEventListener('click', function() {
+            clearPathNodes();
+            findAndDisplayPath(3, 12, 8, 4); // 需要绕过墙壁
+            moveCharacter(3, 12);
+        });
+        
+        // 测试用例：无路径情况
+        document.getElementById('test-path4').addEventListener('click', function() {
+            clearPathNodes();
+            // 创建一个临时地图，中间有个完全封闭的区域
+            const tempMap = [];
+            for (let i = 0; i < sampleMapData.length; i++) {
+                tempMap[i] = [...sampleMapData[i]];
+            }
+            
+            // 在地图中间创建一个封闭区域
+            for (let i = 9; i < 12; i++) {
+                for (let j = 9; j < 12; j++) {
+                    tempMap[i][j] = 1; // 设置为墙
+                }
+            }
+            
+            // 把中间一个点设为0
+            tempMap[10][10] = 0;
+            
+            // 尝试从外部到这个封闭区域中间
+            const path = findPath(5, 5, 10, 10, tempMap);
+            
+            if (path) {
+                displayPath(path);
+                pathInfo.textContent = `找到路径，长度: ${path.length}\n` + 
+                                       `路径: ${JSON.stringify(path)}`;
+            } else {
+                pathInfo.textContent = "无法找到路径（这是预期的结果，因为目标点被墙壁完全包围）";
+            }
+            
+            moveCharacter(5, 5);
+        });
+        
+        // 方向按钮
+        document.getElementById('move-up').addEventListener('click', function() {
+            if (characterState.y > 0) {
+                moveCharacter(characterState.x, characterState.y - 1);
+            }
+        });
+        
+        document.getElementById('move-down').addEventListener('click', function() {
+            if (characterState.y < gameConfig.mapHeight - 1) {
+                moveCharacter(characterState.x, characterState.y + 1);
+            }
+        });
+        
+        document.getElementById('move-left').addEventListener('click', function() {
+            if (characterState.x > 0) {
+                moveCharacter(characterState.x - 1, characterState.y);
+            }
+        });
+        
+        document.getElementById('move-right').addEventListener('click', function() {
+            if (characterState.x < gameConfig.mapWidth - 1) {
+                moveCharacter(characterState.x + 1, characterState.y);
+            }
+        });
+        
+        // 找到并显示路径
+        function findAndDisplayPath(startX, startY, endX, endY) {
+            clearPathNodes();
+            
+            // 使用A*算法查找路径
+            const path = findPath(startX, startY, endX, endY, sampleMapData);
+            
+            if (path) {
+                displayPath(path);
+                pathState.currentPath = path;
+                
+                pathInfo.textContent = `找到路径，长度: ${path.length}\n` + 
+                                      `起点: (${startX}, ${startY}) 终点: (${endX}, ${endY})\n` +
+                                      `路径: ${JSON.stringify(path)}`;
+            } else {
+                pathInfo.textContent = `无法找到从 (${startX}, ${startY}) 到 (${endX}, ${endY}) 的路径`;
+            }
+        }
+        
+        // 在地图上显示路径
+        function displayPath(path) {
+            if (!path) return;
+            
+            // 清除现有路径节点
+            clearPathNodes();
+            
+            // 为路径上的每个点创建一个标记
+            path.forEach((point, index) => {
+                if (index === 0 || index === path.length - 1) return; // 跳过起点和终点
+                
+                const pathNode = document.createElement('div');
+                pathNode.className = 'path-node';
+                
+                // 计算节点在地图上的像素位置（居中于图块）
+                const pixelX = point.x * gameConfig.tileSize + gameConfig.tileSize / 2;
+                const pixelY = point.y * gameConfig.tileSize + gameConfig.tileSize / 2;
+                
+                pathNode.style.left = `${pixelX - 4}px`; // 居中点（减去节点半径）
+                pathNode.style.top = `${pixelY - 4}px`;  // 居中点（减去节点半径）
+                
+                gameMap.appendChild(pathNode);
+            });
+        }
+        
+        // 清除所有路径节点
+        function clearPathNodes() {
+            const pathNodes = gameMap.querySelectorAll('.path-node');
+            pathNodes.forEach(node => node.remove());
+        }
+        
+        // 重写moveCharacter函数以更新位置信息
+        const originalMoveCharacter = window.moveCharacter;
+        window.moveCharacter = function(x, y) {
+            const result = originalMoveCharacter(x, y);
+            if (result) {
+                updatePositionInfo();
+            }
+            return result;
+        };
+        
+        // 页面加载后更新位置信息
+        window.addEventListener('load', function() {
+            setTimeout(updatePositionInfo, 500); // 给地图加载一点时间
+        });
+    </script>
+</body>
+</html>
